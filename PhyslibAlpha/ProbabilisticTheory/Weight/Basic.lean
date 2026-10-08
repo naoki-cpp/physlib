@@ -5,7 +5,7 @@ Authors: Tom Ole Diem
 -/
 module
 
-public import Physlib.ProbabilisticTheory.OrderUnit.Cone
+public import Physlib.ProbabilisticTheory.Weight.Basic
 public import PhyslibAlpha.ProbabilisticTheory.OrderUnit.PositiveDual
 
 /-!
@@ -52,7 +52,7 @@ open scoped ENNReal NNReal
 -/
 
 /-- An extended nonnegative linear functional on the positive cone. -/
-abbrev Weight (E : Type*) [OrderedVectorSpace E] := PosCone E →ₗ[ℝ≥0] ℝ≥0∞
+abbrev Weight (E : Type*) [OrderedVectorSpace E] := _root_.Weight E
 
 namespace Weight
 
@@ -60,47 +60,22 @@ section OrderedVectorSpace
 
 variable {E : Type*} [OrderedVectorSpace E]
 
+export _root_.Weight
+  (IsFaithful IsFinite IsSemifinite IsNormal monotone toReal_map_nnreal_smul)
+
 @[ext]
 lemma ext {w₁ w₂ : Weight E} (h : ∀ A, w₁ A = w₂ A) : w₁ = w₂ :=
   LinearMap.ext h
 
-/-- Only the zero positive element has weight zero. -/
-def IsFaithful (w : Weight E) : Prop := ∀ A : PosCone E, w A = 0 → A = 0
-
-/-- A weight has no infinite values. -/
-def IsFinite (w : Weight E) : Prop := ∀ A : PosCone E, w A ≠ ⊤
-
-/-- A weight is the supremum of its finite values below each positive element. -/
-def IsSemifinite (w : Weight E) : Prop := ∀ A : PosCone E,
-  w A = ⨆ B : {B : PosCone E // B ≤ A ∧ w B ≠ ⊤}, w B
-
 /-- Weights are monotone on the positive cone. -/
-lemma mono (w : Weight E) : Monotone (w : PosCone E → ℝ≥0∞) := by
-  intro A B hAB
-  have hC : (0 : E) ≤ (B : E) - (A : E) := sub_nonneg.mpr hAB
-  have hAC : A + (⟨(B : E) - (A : E), hC⟩ : PosCone E) = B :=
-    Subtype.ext (show (A : E) + ((B : E) - (A : E)) = B from by abel)
-  rw [← hAC, map_add]
-  exact le_self_add
+lemma mono (w : Weight E) : Monotone (w : PosCone E → ℝ≥0∞) :=
+  w.monotone
 
-/-- A finite weight is semifinite. -/
-lemma IsFinite.isSemifinite {w : Weight E} (hw : w.IsFinite) : w.IsSemifinite := fun A =>
-  le_antisymm (le_iSup_of_le ⟨A, le_rfl, hw A⟩ le_rfl) (iSup_le fun B => w.mono B.2.1)
+namespace IsFinite
 
-/-- A finite weight's real value is additive. -/
-lemma IsFinite.toReal_map_add {w : Weight E} (hw : w.IsFinite) (A B : PosCone E) :
-    (w (A + B)).toReal = (w A).toReal + (w B).toReal := by
-  rw [w.map_add, ENNReal.toReal_add (hw A) (hw B)]
+export _root_.Weight.IsFinite (isSemifinite toReal_map_add)
 
-/-- A weight's real value scales linearly under nonnegative real scaling. -/
-lemma toReal_map_nnreal_smul (w : Weight E) (k : ℝ≥0) (A : PosCone E) :
-    (w (k • A)).toReal = k * (w A).toReal := by
-  rw [w.map_smul, ENNReal.smul_def, smul_eq_mul, ENNReal.toReal_mul, ENNReal.coe_toReal]
-
-/-- A weight is normal when it preserves least upper bounds of increasing sequences in the
-positive cone. -/
-def IsNormal (w : Weight E) : Prop := ∀ (f : ℕ → PosCone E) (A : PosCone E),
-  Monotone f → IsLUB (Set.range f) A → IsLUB (Set.range (w ∘ f)) (w A)
+end IsFinite
 
 end OrderedVectorSpace
 
@@ -114,35 +89,13 @@ section OrderUnitSpace
 
 variable {E : Type*} [OrderUnitSpace E]
 
-/-- A weight that's finite everywhere and gives the certain outcome weight exactly `1`. -/
-structure IsState (w : Weight E) : Prop where
-  /-- A state is finite everywhere. -/
-  finite : w.IsFinite
-  /-- A state gives the certain outcome weight exactly `1`. -/
-  normalized : w 1 = 1
+export _root_.Weight (IsState normalize normalize_apply)
 
-/-- Rescale a weight by the inverse of its value at the order unit. -/
-noncomputable def normalize (w : Weight E) : Weight E where
-  toFun A := (w 1)⁻¹ * w A
-  map_add' A B := by rw [map_add, mul_add]
-  map_smul' c A := by
-    simp only [map_smul, ENNReal.smul_def, smul_eq_mul, RingHom.id_apply]
-    ring
+namespace IsFinite
 
-@[simp] lemma normalize_apply (w : Weight E) (A : PosCone E) :
-    normalize w A = (w 1)⁻¹ * w A := rfl
+export _root_.Weight.IsFinite (normalize_isFinite normalize_isState)
 
-/-- Normalizing a finite weight that's nonzero at the order unit keeps it finite. -/
-lemma IsFinite.normalize_isFinite {w : Weight E} (hw : w.IsFinite) (h : w 1 ≠ 0) :
-    (normalize w).IsFinite := fun A =>
-  ENNReal.mul_ne_top (ENNReal.inv_ne_top.mpr h) (hw A)
-
-/-- Normalizing a finite weight that's nonzero at the order unit makes it a state: the order unit
-is scaled to weight exactly `1`. -/
-lemma IsFinite.normalize_isState {w : Weight E} (hw : w.IsFinite) (h : w 1 ≠ 0) :
-    (normalize w).IsState where
-  finite := hw.normalize_isFinite h
-  normalized := ENNReal.inv_mul_cancel h (hw 1)
+end IsFinite
 
 end OrderUnitSpace
 
